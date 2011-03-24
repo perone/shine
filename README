@@ -80,9 +80,17 @@ a. Creating a developer build with tests:
 
 b. Creating the docs
 
+Inside the created "build" directory.
+
 # make doxygen
 
 A new directory called "doc" will be created with the API documentation.
+
+5) Creating a distribution package
+
+Inside the created "build" directory.
+
+# cpack -G DEB
 
 - Christian S. Perone
 
