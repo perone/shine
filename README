@@ -1,4 +1,42 @@
-Shine
-------------------------
+Shine - Symbolic Regression Machine
+-----------------------------------
 
-TODO
+This is a library under development, the first Release Candidtae is about to be
+released soon.
+
+1) What is Shine ?
+
+Shine is a library that automatically makes the code generation of the LLVM IR 
+(Intermediate Representation) from Genetic Programming trees. It also provides
+an easy API for optimizing and JIT to native code such Genetic Programming ASTs.
+
+Shine follow this flow:
+
+a. Load LLVM bitcode
+    This LLVM bitcode can be from any language supported by the LLVM compiler
+    infrastructure.
+b. Load Genetic Programming trees
+    In this phase, each node representing a non-terminal (a function) is resolved
+    and matched again the previous loaded LLVM bitcode file.
+c. Codegen the AST
+    Shine converts this AST into LLVM IR.
+d. Optimization
+    Shine run LLVM optimization passes in the merged LLVM IR module representing
+    each tree.
+e. JIT
+    Shine uses LLVM to convert this LLVM IR into native code and then returns
+    a function pointer to that native function.
+
+2) What license uses Shine ?
+
+Shine is licensed under LPGL.
+
+3) Language bindings ?
+
+Python language bindings are under development, actually, Shine is a component of
+a bigger project to use state-of-art compiler technology such as optimizations and
+JIT compiling for a Genetic Programming system. In future, Pyevolve will use 
+Shine to JIT its Genetic Programming trees into native code.
+
+- Christian S. Perone
+
