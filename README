@@ -38,5 +38,51 @@ a bigger project to use state-of-art compiler technology such as optimizations a
 JIT compiling for a Genetic Programming system. In future, Pyevolve will use 
 Shine to JIT its Genetic Programming trees into native code.
 
+4) How to install or compile ?
+
+Requirements:
+    LLVM 2.9 rc1+
+    glib-2.0 for tests
+    g++ and cmake (for compiling)
+
+Get the trunk in a directory, let's call it "shine_lib".
+
+a. Creating a developer build with tests:
+
+# cd shine_lib
+# mkdir build
+# cd build
+# cmake -DCMAKE_BUILD_TYPE=Developer -DBUILD_TESTING=true ..
+
+-- The C compiler identification is GNU
+-- The CXX compiler identification is GNU
+-- Check for working C compiler: /usr/bin/gcc
+-- Check for working C compiler: /usr/bin/gcc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++
+-- Check for working CXX compiler: /usr/bin/c++ -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- You have selected the building of the tests.
+-- checking for module 'glib-2.0'
+--   found glib-2.0, version 2.26.1
+-- Found Doxygen: /usr/bin/doxygen
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/tarantula/shine_lib/dev
+
+# make
+
+(wait for the compilation)
+
+# sudo make install
+
+b. Creating the docs
+
+# make doxygen
+
+A new directory called "doc" will be created with the API documentation.
+
 - Christian S. Perone
 
