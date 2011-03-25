@@ -79,6 +79,15 @@ public:
     llvm::Module *get_internal_module()
     { return mInternalModule; }
 
+    /**
+     * Checks if the entire module is a valid double closure
+     * type needed for the system. This method will check
+     * if every function arguments and return types are returning
+     * double or not.
+     *
+     * \param error_string Closure errors found.
+     * \return true if problems were found, false otherwise.
+     */
     bool check_closure(std::string &error_string);
 
 // Public static interface

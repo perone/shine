@@ -128,7 +128,6 @@ bool ModuleLoader::check_closure(std::string &error_string)
     }
 
     error_string = ss_error.str();
-
     return closure_checking;
 }
 
