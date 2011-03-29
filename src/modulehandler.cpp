@@ -23,6 +23,7 @@
 #include "astnode.h"
 
 #include <cassert>
+#include <sstream>
 
 #include <llvm/Module.h>
 #include <llvm/Support/StandardPasses.h>
@@ -32,26 +33,32 @@
 #include <llvm/Constants.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
+#include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Target/TargetSelect.h>
+#include <llvm/Target/TargetData.h>
 
 namespace shine
 {
 ModuleHandler::ModuleHandler(llvm::Module *module,
                              llvm::ExecutionEngine *execution_engine,
-                             llvm::PassManager *pass_manager)
+                             llvm::PassManager *pass_manager,
+                             llvm::FunctionPassManager *func_pass_manager)
 {
     assert(module && "No module provided !");
     assert(execution_engine && "No Execution Engine provided !");
     assert(pass_manager && "No Pass Manager provided !");
+    assert(func_pass_manager && "No Function Pass Manager provided !");
 
     mInternalModule = module;
     mExecutionEngine = execution_engine;
     mPassManager = pass_manager;
+    mFunctionPassManager = func_pass_manager;
 }
 
 ModuleHandler* ModuleHandler::create(llvm::Module *module,
                                      std::string &error_string,
-                                     llvm::PassManager *pass_manager)
+                                     llvm::PassManager *pass_manager,
+                                     llvm::FunctionPassManager *func_pass_manager)
 {
     assert(module && "No module provided !");
 
@@ -83,7 +90,30 @@ ModuleHandler* ModuleHandler::create(llvm::Module *module,
                                       true, false);
     }
 
-    return new ModuleHandler(module, execution_engine, created_pass_manager);
+    llvm::FunctionPassManager *created_func_pass_manager = func_pass_manager;
+
+    if(!func_pass_manager)
+    {
+        // FunctionPassManager doesn't takes the ownership of the Module.
+        created_func_pass_manager = new llvm::FunctionPassManager(module);
+        const llvm::TargetData *exec_engine_td = execution_engine->getTargetData();
+        llvm::TargetData *target_data = new llvm::TargetData(*exec_engine_td);
+
+        created_func_pass_manager->add(target_data);
+        llvm::createStandardFunctionPasses(created_func_pass_manager, 3);
+
+        created_func_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
+        created_func_pass_manager->add(llvm::createInstructionCombiningPass());
+        created_func_pass_manager->add(llvm::createDeadCodeEliminationPass());
+        created_func_pass_manager->add(llvm::createReassociatePass());
+        created_func_pass_manager->add(llvm::createGVNPass());
+        created_func_pass_manager->add(llvm::createLICMPass());
+        created_func_pass_manager->add(llvm::createDeadStoreEliminationPass());
+    }
+
+    return new ModuleHandler(module, execution_engine,
+                             created_pass_manager,
+                             created_func_pass_manager);
 }
 
 ModuleHandler::~ModuleHandler()
@@ -95,15 +125,42 @@ ModuleHandler::~ModuleHandler()
     delete mPassManager;
 }
 
+
 bool ModuleHandler::run_module_passes()
 {
     const bool ret = mPassManager->run(*mInternalModule);
     return ret;
 }
 
+bool ModuleHandler::run_function_passes(const std::string &func_name)
+{
+    llvm::Function *func = mExecutionEngine->FindFunctionNamed(func_name.c_str());
+    assert(func!=NULL && "Function not found !");
+    if(!func) return false;
+    return mFunctionPassManager->run(*func);
+}
+
+std::string ModuleHandler::get_function_ir(const std::string &func_name)
+{
+    llvm::Function *func = mExecutionEngine->FindFunctionNamed(func_name.c_str());
+    assert(func!=NULL && "Function not found !");
+    if(!func) return std::string();
+
+    std::stringstream ss;
+    llvm::raw_os_ostream raw_stream(ss);
+    func->print(raw_stream);
+    return ss.str();
+}
+
 void ModuleHandler::print_module()
 {
     mInternalModule->dump();
+}
+
+void ModuleHandler::print_module(std::ostream &stream)
+{
+    llvm::raw_os_ostream raw_stream(stream);
+    mInternalModule->print(raw_stream, NULL);
 }
 
 llvm::Function* ModuleHandler::declare_function(const std::string &function_name,
@@ -158,6 +215,8 @@ void ModuleHandler::codegen_ast(const std::vector<ASTNode*> *ast_nodes,
 
         switch(node->get_id())
         {
+
+        // Handles the ASTConstant node type
         case ASTNode::AST_CONSTANT:
         {
             const ASTConstant *constant =
@@ -171,6 +230,7 @@ void ModuleHandler::codegen_ast(const std::vector<ASTNode*> *ast_nodes,
             break;
         }
 
+        // Handles the ASTVariable node type
         case ASTNode::AST_VARIABLE:
         {
             const ASTVariable *variable =
@@ -183,6 +243,7 @@ void ModuleHandler::codegen_ast(const std::vector<ASTNode*> *ast_nodes,
             break;
         }
 
+        // Handles the ASTFunction node type
         case ASTNode::AST_FUNCTION:
         {
             const ASTFunction *func_codegen =
@@ -220,9 +281,43 @@ void ModuleHandler::codegen_ast(const std::vector<ASTNode*> *ast_nodes,
 void* ModuleHandler::jit_function(const std::string &func_name)
 {
     llvm::Function *func = mExecutionEngine->FindFunctionNamed(func_name.c_str());
-    if(!func) return func;
-    return mExecutionEngine->recompileAndRelinkFunction(func);
+    if(!func) return NULL;
+
+    void *jit_func = mExecutionEngine->recompileAndRelinkFunction(func);
+
+    if(jit_func)
+        mJITFunctions.insert(std::make_pair(func_name, func));
+
+    return jit_func;
+}
+
+bool ModuleHandler::free_jit_memory(const std::string &func_name)
+{
+    JITFunctionMap::iterator func_it = mJITFunctions.find(func_name);
+
+    if(func_it==mJITFunctions.end())
+        return false;
+
+    llvm::Function *function = func_it->second;
+    mJITFunctions.erase(func_it);
+    mExecutionEngine->freeMachineCodeForFunction(function);
+    return true;
+}
+
+bool ModuleHandler::free_jit_memory(void)
+{
+    bool ret_free = false;
+    for(JITFunctionMap::const_iterator it = mJITFunctions.begin();
+        it!=mJITFunctions.end(); it++)
+    {
+        llvm::Function *item = it->second;
+        mExecutionEngine->freeMachineCodeForFunction(item);
+        ret_free = true;
+    }
+    mJITFunctions.clear();
+    return ret_free;
 }
 
 }
+
 

@@ -86,7 +86,7 @@ int main(void)
 
     delete link;
 
-    mod_handler->run_module_passes();
+    //mod_handler->run_module_passes();
 
     /************************************************************
      *                         NODES
@@ -101,8 +101,6 @@ int main(void)
             GNode *n_i = g_node_append_data(n_g, new ASTFunction("I"));
                 GNode *n_i0 = g_node_append_data(n_i, new ASTConstant(0));
 
-    //ASTNode::print_preorder_traversal(n_f);
-
     std::vector<ASTNode*> ast_nodes;
     g_node_traverse(n_f, G_PRE_ORDER, G_TRAVERSE_ALL, -1,
                     stack_traversal, &ast_nodes);
@@ -113,10 +111,15 @@ int main(void)
     mod_handler->set_variable_list(vars);
     assert(mod_handler->get_variable_list()==vars);
 
-    for(int i=0; i<2; i++)
-        mod_handler->codegen_ast(&ast_nodes, "my_func");
+    mod_handler->codegen_ast(&ast_nodes, "my_func");
+
+    std::cout << mod_handler->get_function_ir("my_func") << std::endl;
+    mod_handler->run_function_passes("my_func");
 
     void *func_ptr = mod_handler->jit_function("my_func");
+    mod_handler->free_jit_memory();
+    func_ptr = mod_handler->jit_function("my_func");
+
     if(!func_ptr)
     {
         std::cout << "Error: function not found !" << std::endl;
