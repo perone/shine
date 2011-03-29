@@ -133,7 +133,9 @@ In order to compile and use Shine, you'll need the follow libraries/tools:
     **Version tested:** 1.7.1
 
 
-
+Installation
+-------------------------------------------------------------------------------
+sdffd
 
 
 

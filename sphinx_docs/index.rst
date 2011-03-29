@@ -1,7 +1,7 @@
 .. default-domain:: cpp
 
-Welcome to Shine's documentation!
-=================================
+.. figure:: images/logo.png
+   :align: center
 
 What is Shine ?
 ---------------
